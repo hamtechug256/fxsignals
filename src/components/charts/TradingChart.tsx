@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ZoomIn, ZoomOut, RotateCcw, TrendingUp, TrendingDown, Loader2, AlertCircle } from 'lucide-react';
 import { getMarketStatus, generateCandleData } from '@/lib/forex-api';
+import type { IChartApi, ISeriesApi, CandlestickData, Time } from 'lightweight-charts';
 
 interface TradingChartProps {
   pair: string;
@@ -22,7 +23,8 @@ const TIMEFRAMES = ['M1', 'M5', 'M15', 'H1', 'H4', 'D1'];
 
 export function TradingChart({ pair, signal }: TradingChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<any>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const [timeframe, setTimeframe] = useState('H1');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,12 +45,12 @@ export function TradingChart({ pair, signal }: TradingChartProps) {
     setError(null);
 
     try {
-      // Dynamic import of lightweight-charts
+      // Dynamic import of lightweight-charts v5
       const LightweightCharts = await import('lightweight-charts');
       
-      const createChart = LightweightCharts.createChart;
+      const { createChart, CandlestickSeries } = LightweightCharts;
       
-      if (!createChart) {
+      if (!createChart || !CandlestickSeries) {
         throw new Error('Chart library not loaded properly');
       }
 
@@ -60,6 +62,7 @@ export function TradingChart({ pair, signal }: TradingChartProps) {
           // Ignore cleanup errors
         }
         chartRef.current = null;
+        seriesRef.current = null;
       }
 
       // Generate candle data
@@ -69,7 +72,7 @@ export function TradingChart({ pair, signal }: TradingChartProps) {
         throw new Error('No chart data available');
       }
 
-      // Create chart
+      // Create chart with v5 API
       const chart = createChart(chartContainerRef.current, {
         layout: {
           background: { color: 'transparent' },
@@ -95,33 +98,18 @@ export function TradingChart({ pair, signal }: TradingChartProps) {
         },
       });
 
-      // Add candlestick series - handle both v4 and v5 API
-      let candlestickSeries: any;
-      
-      try {
-        // Try v5 API first
-        candlestickSeries = chart.addSeries({
-          type: 'Candlestick',
-          upColor: '#10b981',
-          downColor: '#ef4444',
-          borderUpColor: '#10b981',
-          borderDownColor: '#ef4444',
-          wickUpColor: '#10b981',
-          wickDownColor: '#ef4444',
-        });
-      } catch (e) {
-        // Fall back to v4 API
-        candlestickSeries = chart.addCandlestickSeries({
-          upColor: '#10b981',
-          downColor: '#ef4444',
-          borderUpColor: '#10b981',
-          borderDownColor: '#ef4444',
-          wickUpColor: '#10b981',
-          wickDownColor: '#ef4444',
-        });
-      }
+      // Add candlestick series using v5 API: chart.addSeries(SeriesDefinition, options)
+      const candlestickSeries = chart.addSeries(CandlestickSeries, {
+        upColor: '#10b981',
+        downColor: '#ef4444',
+        borderUpColor: '#10b981',
+        borderDownColor: '#ef4444',
+        wickUpColor: '#10b981',
+        wickDownColor: '#ef4444',
+      });
 
-      candlestickSeries.setData(candleData);
+      // Set data with proper typing
+      candlestickSeries.setData(candleData as CandlestickData<Time>[]);
 
       // Add signal levels if provided
       if (signal) {
@@ -171,6 +159,7 @@ export function TradingChart({ pair, signal }: TradingChartProps) {
 
       chart.timeScale().fitContent();
       chartRef.current = chart;
+      seriesRef.current = candlestickSeries;
       setIsLoading(false);
 
     } catch (err: any) {
@@ -189,6 +178,7 @@ export function TradingChart({ pair, signal }: TradingChartProps) {
           chartRef.current.remove();
         } catch (e) {}
         chartRef.current = null;
+        seriesRef.current = null;
       }
     };
   }, [initChart]);

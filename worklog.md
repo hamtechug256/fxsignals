@@ -111,3 +111,46 @@ Updated `/home/z/my-project/prisma/schema.prisma`:
 2. Push code to GitHub
 3. Vercel will auto-redeploy with database connected
 
+---
+## Task ID: 3 - Chart API Fix & Market Status
+### Work Task
+Fix TradingView charts not loading (`i.addCandlestickSeries is not a function` error) and show real market status instead of fake "live" data on weekends.
+
+### Problem Analysis
+1. **Chart Error**: The `lightweight-charts` library v5 has a different API than v4
+   - Old API: `chart.addCandlestickSeries(options)` - DEPRECATED
+   - New API: `chart.addSeries(CandlestickSeries, options)` - REQUIRED
+2. **Market Status**: App was showing fake "Live" indicators on Saturday when forex markets are closed
+
+### Work Summary
+
+#### 1. lightweight-charts v5 API Migration
+Updated `/home/z/my-project/src/components/charts/TradingChart.tsx`:
+- Changed from `chart.addCandlestickSeries()` to `chart.addSeries(CandlestickSeries, {...})`
+- Added proper TypeScript types from `lightweight-charts`
+- Dynamic import of `CandlestickSeries` definition along with `createChart`
+
+#### 2. Market Status Detection
+Updated `/home/z/my-project/src/lib/forex-api.ts`:
+- Added `getMarketStatus()` function that detects:
+  - Saturday: Market closed all day
+  - Sunday: Market opens at 22:00 GMT
+  - Friday: Market closes at 22:00 GMT
+- Returns session name (Sydney/Tokyo, London, London/NY, NY) when open
+- Returns countdown to next open when closed
+
+#### 3. UI Updates
+- AppLayout shows real market status badge (green "Open" or yellow "Closed")
+- Chart component shows market closed warning when markets are closed
+- Weekend prices show static Friday close prices, not fake random movements
+
+### Technical Details
+- lightweight-charts v5 exports: `CandlestickSeries`, `LineSeries`, `AreaSeries`, etc.
+- Usage: `chart.addSeries(CandlestickSeries, { upColor, downColor, ... })`
+- Market hours: Opens Sunday 22:00 GMT, closes Friday 22:00 GMT
+
+### Files Modified
+- `/src/components/charts/TradingChart.tsx` - v5 API migration
+- `/src/lib/forex-api.ts` - Market status detection
+- `/src/components/AppLayout.tsx` - Real market status display
+
