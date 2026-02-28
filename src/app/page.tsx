@@ -1,35 +1,83 @@
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { Hero } from '@/components/Hero';
-import { SignalsList } from '@/components/SignalsList';
-import { PerformanceCard } from '@/components/PerformanceCard';
 import { Features } from '@/components/Features';
 import { FAQ } from '@/components/FAQ';
 import { CTA } from '@/components/CTA';
 import { SubscriptionManager } from '@/components/SubscriptionManager';
-import { UserDashboard } from '@/components/UserDashboard';
+import { PriceTicker } from '@/components/charts/PriceTicker';
+import { MarketSessions } from '@/components/tools/MarketSessions';
+import { RiskCalculator } from '@/components/tools/RiskCalculator';
+import { EconomicCalendar } from '@/components/tools/EconomicCalendar';
+import { AnalyticsDashboard } from '@/components/analytics/AnalyticsDashboard';
+import { SignalsListPro } from '@/components/signals/SignalsListPro';
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-black text-white">
+      {/* Price Ticker */}
+      <PriceTicker />
+
       {/* Header */}
       <Header />
 
       {/* Hero Section */}
       <Hero />
 
-      {/* User Dashboard (for logged in users) */}
-      <section id="dashboard" className="py-8 px-4">
-        <div className="container mx-auto">
-          <UserDashboard />
+      {/* Market Sessions & Economic Calendar */}
+      <section className="py-12 px-4 border-b border-gray-800">
+        <div className="container mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <MarketSessions />
+          <EconomicCalendar />
         </div>
       </section>
 
       {/* Live Signals Section */}
-      <SignalsList />
+      <section id="signals" className="py-16 px-4">
+        <div className="container mx-auto">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+              Live Trading Signals
+            </h2>
+            <p className="text-gray-400 max-w-2xl mx-auto">
+              Professional ICT-based signals with entry, stop loss, and multiple take profits.
+              Updated in real-time with live price tracking.
+            </p>
+          </div>
+          <SignalsListPro />
+        </div>
+      </section>
 
-      {/* Performance Section */}
-      <PerformanceCard />
+      {/* Risk Calculator */}
+      <section id="calculator" className="py-16 px-4 bg-gray-900/30">
+        <div className="container mx-auto">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+              Risk Management Calculator
+            </h2>
+            <p className="text-gray-400 max-w-2xl mx-auto">
+              Calculate your position size, pip value, and potential profit/loss.
+              Professional risk management at your fingertips.
+            </p>
+          </div>
+          <RiskCalculator />
+        </div>
+      </section>
+
+      {/* Performance Analytics */}
+      <section id="analytics" className="py-16 px-4">
+        <div className="container mx-auto">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+              Performance Analytics
+            </h2>
+            <p className="text-gray-400 max-w-2xl mx-auto">
+              Track our performance with detailed analytics. Real data, real results.
+            </p>
+          </div>
+          <AnalyticsDashboard />
+        </div>
+      </section>
 
       {/* Features Section */}
       <Features />
