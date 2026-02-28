@@ -23,7 +23,6 @@ const TIMEFRAMES = ['M1', 'M5', 'M15', 'H1', 'H4', 'D1'];
 export function TradingChart({ pair, signal }: TradingChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
-  const seriesRef = useRef<any>(null);
   const [timeframe, setTimeframe] = useState('H1');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,13 +44,22 @@ export function TradingChart({ pair, signal }: TradingChartProps) {
 
     try {
       // Dynamic import of lightweight-charts
-      const { createChart, ColorType } = await import('lightweight-charts');
+      const LightweightCharts = await import('lightweight-charts');
+      
+      const createChart = LightweightCharts.createChart;
+      
+      if (!createChart) {
+        throw new Error('Chart library not loaded properly');
+      }
 
       // Clear existing chart
       if (chartRef.current) {
-        chartRef.current.remove();
+        try {
+          chartRef.current.remove();
+        } catch (e) {
+          // Ignore cleanup errors
+        }
         chartRef.current = null;
-        seriesRef.current = null;
       }
 
       // Generate candle data
@@ -64,7 +72,7 @@ export function TradingChart({ pair, signal }: TradingChartProps) {
       // Create chart
       const chart = createChart(chartContainerRef.current, {
         layout: {
-          background: { type: ColorType.Solid, color: 'transparent' },
+          background: { color: 'transparent' },
           textColor: '#9ca3af',
         },
         grid: {
@@ -87,21 +95,36 @@ export function TradingChart({ pair, signal }: TradingChartProps) {
         },
       });
 
-      // Add candlestick series
-      const candlestickSeries = chart.addCandlestickSeries({
-        upColor: '#10b981',
-        downColor: '#ef4444',
-        borderUpColor: '#10b981',
-        borderDownColor: '#ef4444',
-        wickUpColor: '#10b981',
-        wickDownColor: '#ef4444',
-      });
+      // Add candlestick series - handle both v4 and v5 API
+      let candlestickSeries: any;
+      
+      try {
+        // Try v5 API first
+        candlestickSeries = chart.addSeries({
+          type: 'Candlestick',
+          upColor: '#10b981',
+          downColor: '#ef4444',
+          borderUpColor: '#10b981',
+          borderDownColor: '#ef4444',
+          wickUpColor: '#10b981',
+          wickDownColor: '#ef4444',
+        });
+      } catch (e) {
+        // Fall back to v4 API
+        candlestickSeries = chart.addCandlestickSeries({
+          upColor: '#10b981',
+          downColor: '#ef4444',
+          borderUpColor: '#10b981',
+          borderDownColor: '#ef4444',
+          wickUpColor: '#10b981',
+          wickDownColor: '#ef4444',
+        });
+      }
 
       candlestickSeries.setData(candleData);
 
       // Add signal levels if provided
       if (signal) {
-        // Entry line
         candlestickSeries.createPriceLine({
           price: signal.entryPrice,
           color: '#3b82f6',
@@ -109,7 +132,6 @@ export function TradingChart({ pair, signal }: TradingChartProps) {
           title: 'Entry',
         });
 
-        // Stop Loss line
         candlestickSeries.createPriceLine({
           price: signal.stopLoss,
           color: '#ef4444',
@@ -118,7 +140,6 @@ export function TradingChart({ pair, signal }: TradingChartProps) {
           title: 'SL',
         });
 
-        // Take Profit 1 line
         candlestickSeries.createPriceLine({
           price: signal.takeProfit1,
           color: '#10b981',
@@ -150,7 +171,6 @@ export function TradingChart({ pair, signal }: TradingChartProps) {
 
       chart.timeScale().fitContent();
       chartRef.current = chart;
-      seriesRef.current = candlestickSeries;
       setIsLoading(false);
 
     } catch (err: any) {
@@ -165,7 +185,9 @@ export function TradingChart({ pair, signal }: TradingChartProps) {
 
     return () => {
       if (chartRef.current) {
-        chartRef.current.remove();
+        try {
+          chartRef.current.remove();
+        } catch (e) {}
         chartRef.current = null;
       }
     };
