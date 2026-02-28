@@ -4,15 +4,14 @@ import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import {
   TrendingUp, TrendingDown, Target, ShieldAlert, Clock, BarChart3,
-  ChevronUp, ChevronDown, ChevronRight, CheckCircle2, XCircle, Zap, Activity, Timer,
-  RefreshCw, Filter, Search, Eye, EyeOff, AlertTriangle, Sparkles, Signal
+  ChevronRight, CheckCircle2, XCircle, Zap, Activity,
+  RefreshCw, Search, Eye, Sparkles, Signal, Filter, Crown,
+  Flame, ArrowUpRight, ArrowDownRight, X, ExternalLink
 } from 'lucide-react';
-import { AppLayout } from '@/components/AppLayout';
 import { TradingChart } from '@/components/charts/TradingChart';
 import { calculatePips, formatPrice } from '@/lib/forex-api';
 
@@ -34,8 +33,21 @@ interface Signal {
   createdAt: string;
 }
 
+// Live indicator component
+function LiveIndicator() {
+  return (
+    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+      <div className="relative">
+        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+        <div className="absolute inset-0 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+      </div>
+      <span className="text-[10px] font-medium text-emerald-400">LIVE</span>
+    </div>
+  );
+}
+
 // Signal card component
-function SignalCard({ signal, onExpand }: { signal: Signal; onExpand: () => void }) {
+function SignalCard({ signal, onExpand, delay = 0 }: { signal: Signal; onExpand: () => void; delay?: number }) {
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -70,12 +82,15 @@ function SignalCard({ signal, onExpand }: { signal: Signal; onExpand: () => void
   const rewardPips = Math.abs(calculatePips(signal.pair, signal.entryPrice, signal.takeProfit1));
   const rrRatio = (rewardPips / riskPips).toFixed(1);
 
-  const statusColors: Record<string, string> = {
-    'ACTIVE': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-    'HIT_TP': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    'HIT_SL': 'bg-red-500/10 text-red-400 border-red-500/20',
-    'CLOSED': 'bg-gray-500/10 text-gray-400 border-gray-500/20',
+  const statusConfig: Record<string, { bg: string; text: string; border: string; icon: any }> = {
+    'ACTIVE': { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20', icon: Zap },
+    'HIT_TP': { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', icon: CheckCircle2 },
+    'HIT_SL': { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/20', icon: XCircle },
+    'CLOSED': { bg: 'bg-gray-500/10', text: 'text-gray-400', border: 'border-gray-500/20', icon: Clock },
   };
+
+  const statusStyle = statusConfig[signal.status] || statusConfig['ACTIVE'];
+  const StatusIcon = statusStyle.icon;
 
   const timeAgo = (date: string) => {
     const seconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
@@ -88,121 +103,146 @@ function SignalCard({ signal, onExpand }: { signal: Signal; onExpand: () => void
     return `${days}d ago`;
   };
 
-  const getConfidenceColor = (conf: number) => {
-    if (conf >= 85) return 'from-emerald-500 to-emerald-400';
-    if (conf >= 70) return 'from-yellow-500 to-yellow-400';
+  const getConfidenceGradient = (conf: number) => {
+    if (conf >= 85) return 'from-emerald-500 to-teal-400';
+    if (conf >= 70) return 'from-yellow-500 to-amber-400';
     return 'from-orange-500 to-orange-400';
   };
 
   return (
-    <Card className="bg-gradient-to-br from-white/[0.03] to-white/[0.01] border-white/5 hover:border-emerald-500/20 transition-all duration-300 overflow-hidden group">
+    <Card 
+      className="group relative overflow-hidden bg-gradient-to-br from-white/[0.04] to-white/[0.01] border-white/5 hover:border-white/20 transition-all duration-500 animate-fade-in-up"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      {/* Hover gradient overlay */}
+      <div className={`absolute inset-0 ${isBuy ? 'bg-gradient-to-br from-emerald-500/5' : 'bg-gradient-to-br from-red-500/5'} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+
       {/* Header */}
-      <div className="p-4 border-b border-white/5">
+      <div className="relative z-10 p-4 border-b border-white/5">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-              isBuy ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-red-500/10 border border-red-500/20'
+          <div className="flex items-center gap-4">
+            {/* Icon */}
+            <div className={`relative w-14 h-14 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 ${
+              isBuy 
+                ? 'bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border border-emerald-500/20' 
+                : 'bg-gradient-to-br from-red-500/20 to-red-500/5 border border-red-500/20'
             }`}>
               {isBuy ? (
-                <TrendingUp className="h-5 w-5 text-emerald-400" />
+                <TrendingUp className="h-6 w-6 text-emerald-400" />
               ) : (
-                <TrendingDown className="h-5 w-5 text-red-400" />
+                <TrendingDown className="h-6 w-6 text-red-400" />
+              )}
+              {signal.status === 'ACTIVE' && (
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-[#0a0a0f] animate-pulse" />
               )}
             </div>
+
+            {/* Pair & Info */}
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-white text-lg">{signal.pair}</h3>
-                <Badge className={statusColors[signal.status] || statusColors['ACTIVE']}>
+                <h3 className="font-bold text-white text-xl">{signal.pair}</h3>
+                <Badge className={`${statusStyle.bg} ${statusStyle.text} border ${statusStyle.border} font-medium`}>
+                  <StatusIcon className="h-3 w-3 mr-1" />
                   {signal.status}
                 </Badge>
               </div>
-              <div className="flex items-center gap-2 mt-0.5">
+              <div className="flex items-center gap-3 mt-1">
                 <span className="text-sm text-gray-400">{signal.timeframe}</span>
                 <span className="text-gray-600">•</span>
-                <span className="text-sm text-gray-400">{timeAgo(signal.createdAt)}</span>
+                <span className="text-sm text-gray-500">{timeAgo(signal.createdAt)}</span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* Right Side */}
+          <div className="flex items-center gap-4">
             {/* Live Price */}
             {livePrice && (
-              <div className="text-right hidden sm:block">
-                <div className="font-mono text-white text-lg">
+              <div className="text-right hidden md:block">
+                <div className="font-mono text-white text-xl font-semibold">
                   {formatPrice(signal.pair, livePrice)}
                 </div>
-                <div className="flex items-center gap-1.5 justify-end">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-xs text-emerald-400">LIVE</span>
-                </div>
+                <LiveIndicator />
               </div>
             )}
 
             {/* Result Badge */}
             {signal.result && (
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${
-                signal.result === 'WIN' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${
+                signal.result === 'WIN' 
+                  ? 'bg-gradient-to-r from-emerald-500/20 to-emerald-500/10 border border-emerald-500/20' 
+                  : 'bg-gradient-to-r from-red-500/20 to-red-500/10 border border-red-500/20'
               }`}>
-                {signal.result === 'WIN' ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-                <span className="font-bold">{signal.pips || 0} pips</span>
+                {signal.result === 'WIN' ? (
+                  <ArrowUpRight className="h-4 w-4 text-emerald-400" />
+                ) : (
+                  <ArrowDownRight className="h-4 w-4 text-red-400" />
+                )}
+                <span className={`font-bold ${signal.result === 'WIN' ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {signal.pips || 0} pips
+                </span>
               </div>
             )}
 
             {/* Type Badge */}
-            <Badge className={`text-sm font-bold ${isBuy ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'} border`}>
+            <div className={`px-4 py-2 rounded-xl font-bold text-sm ${
+              isBuy 
+                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/20' 
+                : 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg shadow-red-500/20'
+            }`}>
               {signal.type}
-            </Badge>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Price Levels Grid */}
-      <div className="p-4">
+      <div className="relative z-10 p-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {/* Entry */}
-          <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/10">
-            <div className="flex items-center gap-1.5 text-blue-400 text-xs mb-1">
-              <Zap className="h-3 w-3" />
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/10 hover:border-blue-500/30 transition-colors">
+            <div className="flex items-center gap-1.5 text-blue-400 text-xs mb-2">
+              <Zap className="h-3.5 w-3.5" />
               Entry
             </div>
-            <div className="font-mono text-white text-lg">{formatPrice(signal.pair, signal.entryPrice)}</div>
-            <div className={`text-xs mt-1 ${Math.abs(distanceToEntry) < 10 ? 'text-blue-400' : 'text-gray-500'}`}>
+            <div className="font-mono text-white text-lg font-semibold">{formatPrice(signal.pair, signal.entryPrice)}</div>
+            <div className={`text-xs mt-1.5 ${Math.abs(distanceToEntry) < 10 ? 'text-blue-400' : 'text-gray-500'}`}>
               {distanceToEntry > 0 ? '+' : ''}{distanceToEntry} pips
             </div>
           </div>
 
           {/* Stop Loss */}
-          <div className="p-3 rounded-xl bg-red-500/5 border border-red-500/10">
-            <div className="flex items-center gap-1.5 text-red-400 text-xs mb-1">
-              <ShieldAlert className="h-3 w-3" />
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-red-500/10 to-red-500/5 border border-red-500/10 hover:border-red-500/30 transition-colors">
+            <div className="flex items-center gap-1.5 text-red-400 text-xs mb-2">
+              <ShieldAlert className="h-3.5 w-3.5" />
               Stop Loss
             </div>
-            <div className="font-mono text-white text-lg">{formatPrice(signal.pair, signal.stopLoss)}</div>
-            <div className="text-xs text-red-400 mt-1">
+            <div className="font-mono text-white text-lg font-semibold">{formatPrice(signal.pair, signal.stopLoss)}</div>
+            <div className="text-xs text-red-400 mt-1.5">
               {isBuy ? '-' : '+'}{Math.abs(distanceToSL)} pips
             </div>
           </div>
 
           {/* Take Profit 1 */}
-          <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-            <div className="flex items-center gap-1.5 text-emerald-400 text-xs mb-1">
-              <Target className="h-3 w-3" />
-              TP1
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/10 hover:border-emerald-500/30 transition-colors">
+            <div className="flex items-center gap-1.5 text-emerald-400 text-xs mb-2">
+              <Target className="h-3.5 w-3.5" />
+              Take Profit 1
             </div>
-            <div className="font-mono text-white text-lg">{formatPrice(signal.pair, signal.takeProfit1)}</div>
-            <div className="text-xs text-emerald-400 mt-1">
+            <div className="font-mono text-white text-lg font-semibold">{formatPrice(signal.pair, signal.takeProfit1)}</div>
+            <div className="text-xs text-emerald-400 mt-1.5">
               {isBuy ? '+' : '-'}{Math.abs(distanceToTP1)} pips
             </div>
           </div>
 
           {/* Risk:Reward */}
-          <div className="p-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
-            <div className="flex items-center gap-1.5 text-purple-400 text-xs mb-1">
-              <BarChart3 className="h-3 w-3" />
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/10 hover:border-purple-500/30 transition-colors">
+            <div className="flex items-center gap-1.5 text-purple-400 text-xs mb-2">
+              <BarChart3 className="h-3.5 w-3.5" />
               Risk:Reward
             </div>
-            <div className="font-mono text-white text-lg">1:{rrRatio}</div>
-            <div className="text-xs text-gray-400 mt-1">Risk {riskPips} pips</div>
+            <div className="font-mono text-white text-lg font-semibold">1:{rrRatio}</div>
+            <div className="text-xs text-gray-400 mt-1.5">Risk {riskPips} pips</div>
           </div>
         </div>
 
@@ -210,16 +250,16 @@ function SignalCard({ signal, onExpand }: { signal: Signal; onExpand: () => void
         {(signal.takeProfit2 || signal.takeProfit3) && (
           <div className="flex gap-3 mt-3">
             {signal.takeProfit2 && (
-              <div className="flex-1 p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/10 flex items-center justify-between">
-                <span className="text-xs text-emerald-400">TP2</span>
-                <span className="font-mono text-white text-sm">{formatPrice(signal.pair, signal.takeProfit2)}</span>
+              <div className="flex-1 p-3 rounded-xl bg-gradient-to-r from-emerald-500/10 to-emerald-500/5 border border-emerald-500/10 flex items-center justify-between">
+                <span className="text-sm text-emerald-400 font-medium">TP2</span>
+                <span className="font-mono text-white">{formatPrice(signal.pair, signal.takeProfit2)}</span>
                 <span className="text-xs text-gray-500">{calculatePips(signal.pair, currentPrice, signal.takeProfit2)} pips</span>
               </div>
             )}
             {signal.takeProfit3 && (
-              <div className="flex-1 p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/10 flex items-center justify-between">
-                <span className="text-xs text-emerald-400">TP3</span>
-                <span className="font-mono text-white text-sm">{formatPrice(signal.pair, signal.takeProfit3)}</span>
+              <div className="flex-1 p-3 rounded-xl bg-gradient-to-r from-emerald-500/10 to-emerald-500/5 border border-emerald-500/10 flex items-center justify-between">
+                <span className="text-sm text-emerald-400 font-medium">TP3</span>
+                <span className="font-mono text-white">{formatPrice(signal.pair, signal.takeProfit3)}</span>
                 <span className="text-xs text-gray-500">{calculatePips(signal.pair, currentPrice, signal.takeProfit3)} pips</span>
               </div>
             )}
@@ -231,18 +271,18 @@ function SignalCard({ signal, onExpand }: { signal: Signal; onExpand: () => void
           {/* Confidence */}
           <div className="flex items-center gap-4">
             <div className="flex-1">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs text-gray-400 flex items-center gap-1">
-                  <Sparkles className="h-3 w-3" />
-                  Confidence
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-400 flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-yellow-400" />
+                  ICT Confidence
                 </span>
-                <span className={`text-sm font-bold bg-gradient-to-r ${getConfidenceColor(signal.confidence)} bg-clip-text text-transparent`}>
+                <span className={`text-sm font-bold bg-gradient-to-r ${getConfidenceGradient(signal.confidence)} bg-clip-text text-transparent`}>
                   {signal.confidence}%
                 </span>
               </div>
-              <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+              <div className="h-2.5 bg-gray-800/50 rounded-full overflow-hidden">
                 <div
-                  className={`h-full bg-gradient-to-r ${getConfidenceColor(signal.confidence)} rounded-full transition-all`}
+                  className={`h-full bg-gradient-to-r ${getConfidenceGradient(signal.confidence)} rounded-full transition-all duration-1000`}
                   style={{ width: `${signal.confidence}%` }}
                 />
               </div>
@@ -251,9 +291,9 @@ function SignalCard({ signal, onExpand }: { signal: Signal; onExpand: () => void
 
           {/* Analysis */}
           {signal.analysis && (
-            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-              <div className="flex items-center gap-1.5 text-gray-400 text-xs mb-1">
-                <Activity className="h-3 w-3" />
+            <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+              <div className="flex items-center gap-1.5 text-gray-400 text-xs mb-2">
+                <Activity className="h-3.5 w-3.5" />
                 ICT Analysis
               </div>
               <p className="text-gray-300 text-sm leading-relaxed">{signal.analysis}</p>
@@ -264,13 +304,32 @@ function SignalCard({ signal, onExpand }: { signal: Signal; onExpand: () => void
         {/* Expand Button */}
         <button
           onClick={onExpand}
-          className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all text-sm font-medium"
+          className="w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 border border-white/5 hover:border-emerald-500/30 transition-all duration-300 text-sm font-medium group/btn"
         >
           <Eye className="h-4 w-4" />
           View Chart Analysis
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />
         </button>
       </div>
+    </Card>
+  );
+}
+
+// Stats card
+function StatCard({ value, label, icon: Icon, gradient, delay = 0 }: { value: number | string; label: string; icon: any; gradient: string; delay?: number }) {
+  return (
+    <Card 
+      className="relative overflow-hidden bg-gradient-to-br from-white/[0.04] to-white/[0.01] border-white/5 hover:border-white/10 transition-all duration-300 group animate-fade-in-up"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`} />
+      <CardContent className="pt-6 pb-6 text-center relative z-10">
+        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center mx-auto mb-3 shadow-lg`}>
+          <Icon className="h-5 w-5 text-white" />
+        </div>
+        <div className="text-3xl font-bold text-white">{value}</div>
+        <div className="text-xs text-gray-400 mt-1">{label}</div>
+      </CardContent>
     </Card>
   );
 }
@@ -327,9 +386,9 @@ export function SignalsPageContent() {
 
   if (loading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 max-w-6xl mx-auto">
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-64 rounded-2xl bg-white/5 animate-pulse" />
+          <div key={i} className="h-72 rounded-2xl bg-white/5 animate-pulse" />
         ))}
       </div>
     );
@@ -338,20 +397,21 @@ export function SignalsPageContent() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 animate-fade-in-up">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Signal className="h-6 w-6 text-emerald-400" />
+          <h1 className="text-2xl lg:text-3xl font-bold text-white flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 shadow-lg shadow-blue-500/20">
+              <Signal className="h-6 w-6 text-white" />
+            </div>
             Trading Signals
           </h1>
-          <p className="text-gray-400 mt-1">Real-time forex signals with ICT analysis</p>
+          <p className="text-gray-400 mt-2">Real-time forex signals with professional ICT analysis</p>
         </div>
 
         <Button
           onClick={() => fetchSignals(true)}
           disabled={refreshing}
-          variant="outline"
-          className="border-white/10 text-gray-300 hover:text-white"
+          className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white border-0 shadow-lg shadow-emerald-500/25"
         >
           <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
           Refresh
@@ -360,55 +420,41 @@ export function SignalsPageContent() {
 
       {/* Stats Row */}
       <div className="grid grid-cols-3 gap-4">
-        <Card className="bg-white/[0.02] border-white/5">
-          <CardContent className="pt-4 pb-4 text-center">
-            <div className="text-2xl font-bold text-white">{stats.total}</div>
-            <div className="text-xs text-gray-400">Total Signals</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-blue-500/5 border-blue-500/10">
-          <CardContent className="pt-4 pb-4 text-center">
-            <div className="text-2xl font-bold text-blue-400">{stats.active}</div>
-            <div className="text-xs text-gray-400">Active</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-emerald-500/5 border-emerald-500/10">
-          <CardContent className="pt-4 pb-4 text-center">
-            <div className="text-2xl font-bold text-emerald-400">{stats.wins}</div>
-            <div className="text-xs text-gray-400">Wins</div>
-          </CardContent>
-        </Card>
+        <StatCard value={stats.total} label="Total Signals" icon={Signal} gradient="from-blue-500 to-cyan-500" delay={100} />
+        <StatCard value={stats.active} label="Active" icon={Flame} gradient="from-orange-500 to-yellow-500" delay={200} />
+        <StatCard value={stats.wins} label="Wins" icon={CheckCircle2} gradient="from-emerald-500 to-teal-500" delay={300} />
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+      <div className="flex flex-col sm:flex-row gap-3 animate-fade-in-up" style={{ animationDelay: '400ms' }}>
+        <div className="relative flex-1 group">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 group-focus-within:text-emerald-400 transition-colors" />
           <Input
             placeholder="Search pairs..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-white/5 border-white/10 focus:border-emerald-500/50"
+            className="pl-10 h-11 bg-white/5 border-white/10 focus:border-emerald-500/50 rounded-xl text-sm"
           />
         </div>
 
         <Select value={filter} onValueChange={setFilter}>
-          <SelectTrigger className="w-32 bg-white/5 border-white/10">
+          <SelectTrigger className="w-36 h-11 bg-white/5 border-white/10 rounded-xl">
+            <Filter className="h-4 w-4 mr-2 text-gray-400" />
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="bg-gray-900 border-white/10">
-            <SelectItem value="all">All</SelectItem>
+          <SelectContent className="bg-gray-900 border-white/10 rounded-xl">
+            <SelectItem value="all">All Signals</SelectItem>
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="closed">Closed</SelectItem>
-            <SelectItem value="wins">Wins</SelectItem>
+            <SelectItem value="wins">Wins Only</SelectItem>
           </SelectContent>
         </Select>
 
         <Select value={pairFilter} onValueChange={setPairFilter}>
-          <SelectTrigger className="w-32 bg-white/5 border-white/10">
+          <SelectTrigger className="w-36 h-11 bg-white/5 border-white/10 rounded-xl">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="bg-gray-900 border-white/10">
+          <SelectContent className="bg-gray-900 border-white/10 rounded-xl">
             <SelectItem value="all">All Pairs</SelectItem>
             {uniquePairs.map(pair => (
               <SelectItem key={pair} value={pair}>{pair}</SelectItem>
@@ -420,19 +466,20 @@ export function SignalsPageContent() {
       {/* Signals List */}
       <div className="space-y-4">
         {filteredSignals.length === 0 ? (
-          <Card className="bg-white/[0.02] border-white/5">
-            <CardContent className="py-16 text-center">
-              <Signal className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-              <p className="text-gray-400">No signals found</p>
-              <p className="text-gray-500 text-sm mt-1">Try adjusting your filters</p>
+          <Card className="bg-gradient-to-br from-white/[0.04] to-white/[0.01] border-white/5">
+            <CardContent className="py-20 text-center">
+              <Signal className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+              <p className="text-gray-400 text-lg font-medium">No signals found</p>
+              <p className="text-gray-500 text-sm mt-2">Try adjusting your filters or check back later</p>
             </CardContent>
           </Card>
         ) : (
-          filteredSignals.map((signal) => (
+          filteredSignals.map((signal, index) => (
             <SignalCard
               key={signal.id}
               signal={signal}
               onExpand={() => setSelectedSignal(signal)}
+              delay={500 + index * 100}
             />
           ))
         )}
@@ -440,21 +487,38 @@ export function SignalsPageContent() {
 
       {/* Chart Modal */}
       {selectedSignal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-[#0d0d12] rounded-2xl border border-white/10">
-            <div className="p-4 border-b border-white/5 flex items-center justify-between">
-              <h2 className="font-bold text-lg text-white flex items-center gap-2">
-                {selectedSignal.pair} - {selectedSignal.type}
-              </h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in-scale">
+          <div className="w-full max-w-5xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-[#0d0d12] to-[#0a0a0f] rounded-3xl border border-white/10 shadow-2xl">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-white/5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                  selectedSignal.type === 'BUY' 
+                    ? 'bg-gradient-to-br from-emerald-500 to-teal-500' 
+                    : 'bg-gradient-to-br from-red-500 to-rose-500'
+                }`}>
+                  {selectedSignal.type === 'BUY' ? (
+                    <TrendingUp className="h-5 w-5 text-white" />
+                  ) : (
+                    <TrendingDown className="h-5 w-5 text-white" />
+                  )}
+                </div>
+                <div>
+                  <h2 className="font-bold text-xl text-white">{selectedSignal.pair}</h2>
+                  <p className="text-sm text-gray-400">{selectedSignal.type} Signal • {selectedSignal.timeframe}</p>
+                </div>
+              </div>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setSelectedSignal(null)}
-                className="text-gray-400 hover:text-white"
+                className="text-gray-400 hover:text-white hover:bg-white/5 rounded-xl"
               >
-                <XCircle className="h-5 w-5" />
+                <X className="h-5 w-5" />
               </Button>
             </div>
+
+            {/* Chart */}
             <div className="p-4">
               <TradingChart
                 pair={selectedSignal.pair}
@@ -468,6 +532,19 @@ export function SignalsPageContent() {
                 }}
               />
             </div>
+
+            {/* Analysis */}
+            {selectedSignal.analysis && (
+              <div className="px-5 pb-5">
+                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                  <div className="flex items-center gap-2 text-gray-400 text-xs mb-2">
+                    <Activity className="h-4 w-4" />
+                    ICT Analysis
+                  </div>
+                  <p className="text-gray-300 text-sm leading-relaxed">{selectedSignal.analysis}</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
