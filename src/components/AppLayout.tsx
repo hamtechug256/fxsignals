@@ -6,12 +6,13 @@ import { usePathname } from 'next/navigation';
 import { useState, useSyncExternalStore, useCallback } from 'react';
 import {
   TrendingUp, LayoutDashboard, Signal, BarChart3, CreditCard, BookOpen,
-  Bell, Search, Menu, X, ChevronRight, Sparkles, Crown, Zap
+  Bell, Search, Menu, X, ChevronRight, Sparkles, Crown, Zap, AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { LoginButton } from '@/components/LoginButton';
 import { AdminPanel } from '@/components/AdminPanel';
+import { getMarketStatus, MarketStatus } from '@/lib/forex-api';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard, gradient: 'from-emerald-500 to-teal-500' },
@@ -103,6 +104,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     () => true,
     () => false
   );
+
+  // Get market status directly (no state needed - it's computed)
+  const marketStatus = mounted ? getMarketStatus() : null;
 
   if (!mounted) {
     return null;
@@ -271,14 +275,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
             {/* Right Side */}
             <div className="flex items-center gap-2">
-              {/* Live Indicator */}
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                <div className="relative">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                  <div className="absolute inset-0 w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              {/* Market Status Indicator */}
+              {marketStatus && (
+                <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border ${
+                  marketStatus.isOpen 
+                    ? 'bg-emerald-500/10 border-emerald-500/20' 
+                    : 'bg-yellow-500/10 border-yellow-500/20'
+                }`}>
+                  <div className="relative">
+                    <div className={`w-2 h-2 rounded-full ${marketStatus.isOpen ? 'bg-emerald-400' : 'bg-yellow-400'}`} />
+                    {marketStatus.isOpen && (
+                      <div className="absolute inset-0 w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    )}
+                  </div>
+                  <span className={`text-xs font-medium ${marketStatus.isOpen ? 'text-emerald-400' : 'text-yellow-400'}`}>
+                    {marketStatus.isOpen ? marketStatus.session : 'Closed'}
+                  </span>
                 </div>
-                <span className="text-xs font-medium text-emerald-400">Live</span>
-              </div>
+              )}
 
               {/* Notifications */}
               <Button variant="ghost" size="icon" className="relative text-gray-400 hover:text-white hover:bg-white/5 rounded-xl">
