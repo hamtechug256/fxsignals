@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(cuid())
+  name            String?
+  email           String    @unique
+  emailVerified   DateTime?
+  image           String?
+  password        String?
+  role            String    @default("USER")
+  plan            String    @default("FREE")
+  subscriptionEnd DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Signal {
+  id          String   @id @default(cuid())
+  pair        String
+  type        String
+  entryPrice  Float
+  takeProfit1 Float
+  takeProfit2 Float?
+  stopLoss    Float
+  analysis    String?
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  result      String?
+  pips        Float?
+}
+
+model Subscriber {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  name            String?
+  phone           String?
+  plan            String   @default("FREE")
+  active          Boolean  @default(true)
+  pushEnabled     Boolean  @default(false)
+  onesignalId     String?
+  deviceType      String?
+  subscriptionEnd DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model PushSubscriber {
+  id         String   @id @default(cuid())
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  deviceInfo String?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model SignalPerformance {
+  id           String   @id @default(cuid())
+  totalSignals Int      @default(0)
+  winCount     Int      @default(0)
+  lossCount    Int      @default(0)
+  pendingCount Int      @default(0)
+  winRate      Float    @default(0)
+  avgPips      Float    @default(0)
+  updatedAt    DateTime @updatedAt
+}
+
+model NotificationLog {
+  id           String   @id @default(cuid())
+  signalId     String
+  title        String
+  message      String
+  sentCount    Int      @default(0)
+  successCount Int      @default(0)
+  failCount    Int      @default(0)
+  createdAt    DateTime @default(now())
+}

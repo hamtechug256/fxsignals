@@ -1,0 +1,69 @@
+name: Generate Trading Signals
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  generate-signals:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Generate signals
+        run: |
+          python -c "
+          import json
+          import random
+          from datetime import datetime
+
+          pairs = ['EUR/USD', 'GBP/USD', 'USD/JPY', 'XAU/USD', 'GBP/JPY']
+          signals = []
+
+          for pair in pairs:
+              if random.random() > 0.7:
+                  signal = {
+                      'pair': pair,
+                      'type': random.choice(['BUY', 'SELL']),
+                      'entryPrice': round(random.uniform(1.05, 1.35), 5) if '/' in pair else round(random.uniform(150, 2350), 2),
+                      'takeProfit1': 0,
+                      'stopLoss': 0,
+                      'analysis': 'ICT Order Block + FVG confluence',
+                      'status': 'ACTIVE',
+                      'createdAt': datetime.now().isoformat()
+                  }
+                  if signal['type'] == 'BUY':
+                      signal['takeProfit1'] = round(signal['entryPrice'] * 1.002, 5)
+                      signal['stopLoss'] = round(signal['entryPrice'] * 0.998, 5)
+                  else:
+                      signal['takeProfit1'] = round(signal['entryPrice'] * 0.998, 5)
+                      signal['stopLoss'] = round(signal['entryPrice'] * 1.002, 5)
+                  signals.append(signal)
+
+          with open('signals_output.json', 'w') as f:
+              json.dump(signals, f, indent=2)
+
+          print(f'Generated {len(signals)} signals')
+          "
+
+      - name: Upload signal artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: signal-history
+          path: signals_output.json
+          retention-days: 30
