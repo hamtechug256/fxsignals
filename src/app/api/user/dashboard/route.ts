@@ -1,9 +1,68 @@
-import { NextResponse } from 'next/server';
-const mockSignals = [
-  { id: '1', pair: 'EUR/USD', type: 'BUY', entryPrice: 1.08500, status: 'ACTIVE', result: 'PENDING', pips: null, createdAt: new Date().toISOString() },
-  { id: '2', pair: 'GBP/USD', type: 'SELL', entryPrice: 1.26500, status: 'HIT_TP1', result: 'WIN', pips: 45.5, createdAt: new Date(Date.now() - 86400000).toISOString() },
-  { id: '3', pair: 'XAU/USD', type: 'BUY', entryPrice: 2325.50, status: 'HIT_TP2', result: 'WIN', pips: 95.0, createdAt: new Date(Date.now() - 172800000).toISOString() },
-];
-export async function GET() {
-  return NextResponse.json({ signals: mockSignals, stats: { totalSignals: 156, winRate: 67.3, avgPips: 23.5 }, user: { plan: 'FREE', name: 'Guest' } });
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/db';
+
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.email) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+    });
+
+    if (!user) {
+      return NextResponse.json({ message: 'User not found' }, { status: 404 });
+    }
+
+    // Get recent signals based on plan
+    const signalLimit = user.plan === 'FREE' ? 3 : user.plan === 'PREMIUM' ? 20 : 100;
+
+    const signals = await prisma.signal.findMany({
+      take: signalLimit,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Calculate stats
+    const allSignals = await prisma.signal.findMany({
+      where: { result: { not: null } },
+    });
+
+    const winCount = allSignals.filter(s => s.result === 'WIN').length;
+    const totalWithResult = allSignals.length;
+    const winRate = totalWithResult > 0 ? (winCount / totalWithResult) * 100 : 0;
+
+    const totalPips = allSignals.reduce((acc, s) => acc + (s.pips || 0), 0);
+    const avgPips = totalWithResult > 0 ? totalPips / totalWithResult : 0;
+
+    const performance = await prisma.signalPerformance.findFirst();
+
+    return NextResponse.json({
+      signals: signals.map(s => ({
+        ...s,
+        createdAt: s.createdAt.toISOString(),
+        updatedAt: s.updatedAt.toISOString(),
+      })),
+      stats: {
+        totalSignals: performance?.totalSignals || signals.length,
+        winRate: performance?.winRate || winRate,
+        avgPips: performance?.avgPips || avgPips,
+      },
+      user: {
+        plan: user.plan,
+        name: user.name,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    console.error('Dashboard error:', error);
+    return NextResponse.json(
+      { message: 'Internal server error' },
+      { status: 500 }
+    );
+  }
 }

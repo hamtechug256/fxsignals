@@ -1,34 +1,114 @@
 'use client';
 
-import { Bell, Smartphone, TrendingUp, Shield, Zap, Clock } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { 
+  TrendingUp, 
+  Bell, 
+  BarChart3, 
+  Shield, 
+  Zap, 
+  Clock,
+  Target,
+  Users
+} from 'lucide-react';
+
+const features = [
+  {
+    icon: TrendingUp,
+    title: 'ICT Concepts Based',
+    description: 'Signals based on Inner Circle Trader concepts including order blocks, fair value gaps, and liquidity sweeps.',
+    color: 'text-emerald-400',
+    bgColor: 'bg-emerald-500/20',
+  },
+  {
+    icon: Bell,
+    title: 'Real-Time Telegram Delivery',
+    description: 'Instant signal delivery to your Telegram with detailed analysis and clear entry/exit levels.',
+    color: 'text-blue-400',
+    bgColor: 'bg-blue-500/20',
+  },
+  {
+    icon: BarChart3,
+    title: 'Transparent Track Record',
+    description: 'Every signal is tracked and verified. See our complete performance history with no hidden losses.',
+    color: 'text-purple-400',
+    bgColor: 'bg-purple-500/20',
+  },
+  {
+    icon: Shield,
+    title: 'Risk Management',
+    description: 'Clear stop loss levels on every trade. Proper risk-to-reward ratios to protect your capital.',
+    color: 'text-red-400',
+    bgColor: 'bg-red-500/20',
+  },
+  {
+    icon: Zap,
+    title: 'Quick Analysis',
+    description: 'Concise market analysis explaining the reasoning behind each trade setup.',
+    color: 'text-yellow-400',
+    bgColor: 'bg-yellow-500/20',
+  },
+  {
+    icon: Clock,
+    title: 'Timely Updates',
+    description: 'Get updates on signal progress, targets hit, and trade management suggestions.',
+    color: 'text-cyan-400',
+    bgColor: 'bg-cyan-500/20',
+  },
+  {
+    icon: Target,
+    title: 'Precise Entry Levels',
+    description: 'Exact entry prices with multiple take profit targets for optimal trade management.',
+    color: 'text-orange-400',
+    bgColor: 'bg-orange-500/20',
+  },
+  {
+    icon: Users,
+    title: 'Community Support',
+    description: 'Join a community of like-minded traders. Share ideas and learn from each other.',
+    color: 'text-pink-400',
+    bgColor: 'bg-pink-500/20',
+  },
+];
 
 export function Features() {
-  const features = [
-    { icon: TrendingUp, title: 'ICT-Based Analysis', description: 'Signals based on Order Blocks, Fair Value Gaps, and Liquidity concepts' },
-    { icon: Bell, title: 'Push Notifications', description: 'Instant alerts on your phone when new signals are posted' },
-    { icon: Smartphone, title: 'Install as App', description: 'Add to home screen for quick access and better experience' },
-    { icon: Zap, title: 'Real-Time Updates', description: 'Signals are generated hourly with fresh market analysis' },
-    { icon: Shield, title: 'Verified Results', description: 'All past signals are tracked with transparent performance stats' },
-    { icon: Clock, title: '24/7 Coverage', description: 'Signals for major forex pairs and gold around the clock' },
-  ];
-
   return (
     <section id="features" className="py-20 relative">
       <div className="container mx-auto px-4">
+        {/* Section Header */}
         <div className="text-center mb-12">
-          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">Why Choose FXSignals?</h2>
-          <p className="text-gray-400 max-w-2xl mx-auto">Professional trading signals with modern features</p>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 mb-4">
+            <Zap className="h-4 w-4 text-emerald-400" />
+            <span className="text-sm text-emerald-400">Features</span>
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+            Why Choose Our Signals?
+          </h2>
+          <p className="text-gray-400 max-w-2xl mx-auto">
+            We provide professional-grade trading signals with all the tools you need to succeed.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+        {/* Features Grid */}
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {features.map((feature, index) => (
-            <div key={index} className="p-6 rounded-xl bg-gray-900/50 border border-gray-800 hover:border-emerald-500/30 transition-colors">
-              <div className="w-12 h-12 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-4">
-                <feature.icon className="h-6 w-6 text-emerald-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
-              <p className="text-gray-400 text-sm">{feature.description}</p>
-            </div>
+            <Card
+              key={feature.title}
+              className="group bg-white/5 border-white/10 hover:border-emerald-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/5"
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              <CardContent className="p-6">
+                <div className={`inline-flex p-3 rounded-xl ${feature.bgColor} mb-4 group-hover:scale-110 transition-transform`}>
+                  <feature.icon className={`h-6 w-6 ${feature.color}`} />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  {feature.title}
+                </h3>
+                <p className="text-sm text-gray-400 leading-relaxed">
+                  {feature.description}
+                </p>
+              </CardContent>
+            </Card>
           ))}
         </div>
       </div>

@@ -29,6 +29,9 @@ export async function PATCH(
       data: updateData,
     });
 
+    // Update performance stats
+    await updatePerformance();
+
     return NextResponse.json(signal);
   } catch (error) {
     console.error('Update signal error:', error);
@@ -63,5 +66,45 @@ export async function DELETE(
       { message: 'Internal server error' },
       { status: 500 }
     );
+  }
+}
+
+async function updatePerformance() {
+  const signals = await prisma.signal.findMany({
+    where: { result: { not: null } },
+  });
+
+  const winCount = signals.filter(s => s.result === 'WIN').length;
+  const lossCount = signals.filter(s => s.result === 'LOSS').length;
+  const pendingCount = signals.filter(s => s.result === 'PENDING').length;
+  const totalPips = signals.reduce((acc, s) => acc + (s.pips || 0), 0);
+  const avgPips = signals.length > 0 ? totalPips / signals.length : 0;
+  const winRate = signals.length > 0 ? (winCount / signals.length) * 100 : 0;
+
+  const existing = await prisma.signalPerformance.findFirst();
+
+  if (existing) {
+    await prisma.signalPerformance.update({
+      where: { id: existing.id },
+      data: {
+        totalSignals: signals.length,
+        winCount,
+        lossCount,
+        pendingCount,
+        winRate,
+        avgPips,
+      },
+    });
+  } else {
+    await prisma.signalPerformance.create({
+      data: {
+        totalSignals: signals.length,
+        winCount,
+        lossCount,
+        pendingCount,
+        winRate,
+        avgPips,
+      },
+    });
   }
 }

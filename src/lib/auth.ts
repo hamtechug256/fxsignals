@@ -6,10 +6,12 @@ import bcrypt from "bcryptjs";
 
 export const authOptions: NextAuthOptions = {
   providers: [
+    // GitHub Provider - Free OAuth
     GitHubProvider({
       clientId: process.env.GITHUB_CLIENT_ID || "",
       clientSecret: process.env.GITHUB_CLIENT_SECRET || "",
     }),
+    // Credentials Provider - Email/Password
     CredentialsProvider({
       name: "credentials",
       credentials: {

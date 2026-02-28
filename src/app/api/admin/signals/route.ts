@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Update performance stats
     await updatePerformance();
 
     return NextResponse.json(signal, { status: 201 });

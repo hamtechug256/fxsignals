@@ -1,19 +1,20 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { db } from '@/lib/db';
 
+// GET - Return 5 most recent ACTIVE signals
 export async function GET() {
   try {
-    const signals = await prisma.signal.findMany({
+    const signals = await db.signal.findMany({
       where: { status: 'ACTIVE' },
-      take: 5,
       orderBy: { createdAt: 'desc' },
+      take: 5,
     });
 
-    return NextResponse.json({ signals });
+    return NextResponse.json(signals);
   } catch (error) {
-    console.error('Fetch latest signals error:', error);
+    console.error('Error fetching latest signals:', error);
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { error: 'Failed to fetch latest signals' },
       { status: 500 }
     );
   }

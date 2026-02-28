@@ -1,48 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { db } from '@/lib/db';
+import { subscribeToPush, unsubscribeFromPush, getPushSubscriberCount } from '@/lib/push';
 
+// POST - Subscribe to push notifications
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
     const body = await request.json();
-    const { endpoint, keys } = body;
+    const { endpoint, keys, deviceInfo } = body;
 
     if (!endpoint || !keys?.p256dh || !keys?.auth) {
       return NextResponse.json(
-        { message: 'Missing subscription data' },
+        { error: 'Missing required subscription data' },
         { status: 400 }
       );
     }
 
-    const existing = await prisma.pushSubscriber.findUnique({
-      where: { endpoint },
-    });
-
-    if (existing) {
-      await prisma.pushSubscriber.update({
-        where: { endpoint },
-        data: { active: true },
-      });
-      return NextResponse.json({ message: 'Subscription updated' });
-    }
-
-    await prisma.pushSubscriber.create({
-      data: {
+    const result = await subscribeToPush(
+      {
         endpoint,
-        p256dh: keys.p256dh,
-        auth: keys.auth,
+        keys: {
+          p256dh: keys.p256dh,
+          auth: keys.auth,
+        },
       },
-    });
+      session?.user?.id,
+      deviceInfo
+    );
 
-    return NextResponse.json({ message: 'Subscribed successfully' }, { status: 201 });
+    if (result.success) {
+      return NextResponse.json({
+        success: true,
+        message: 'Successfully subscribed to push notifications',
+        id: result.id,
+      });
+    } else {
+      return NextResponse.json(
+        { error: 'Failed to subscribe' },
+        { status: 500 }
+      );
+    }
   } catch (error) {
-    console.error('Push subscribe error:', error);
+    console.error('Push subscription error:', error);
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { error: 'Failed to subscribe' },
       { status: 500 }
     );
   }
 }
 
+// DELETE - Unsubscribe from push notifications
 export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json();
@@ -50,21 +59,46 @@ export async function DELETE(request: NextRequest) {
 
     if (!endpoint) {
       return NextResponse.json(
-        { message: 'Missing endpoint' },
+        { error: 'Endpoint required' },
         { status: 400 }
       );
     }
 
-    await prisma.pushSubscriber.update({
-      where: { endpoint },
-      data: { active: false },
-    });
+    const success = await unsubscribeFromPush(endpoint);
 
-    return NextResponse.json({ message: 'Unsubscribed successfully' });
+    if (success) {
+      return NextResponse.json({
+        success: true,
+        message: 'Unsubscribed from push notifications',
+      });
+    } else {
+      return NextResponse.json(
+        { error: 'Failed to unsubscribe' },
+        { status: 500 }
+      );
+    }
   } catch (error) {
-    console.error('Push unsubscribe error:', error);
+    console.error('Push unsubscription error:', error);
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { error: 'Failed to unsubscribe' },
+      { status: 500 }
+    );
+  }
+}
+
+// GET - Get subscription count
+export async function GET() {
+  try {
+    const count = await getPushSubscriberCount();
+
+    return NextResponse.json({
+      success: true,
+      subscriberCount: count,
+    });
+  } catch (error) {
+    console.error('Get subscriber count error:', error);
+    return NextResponse.json(
+      { error: 'Failed to get count' },
       { status: 500 }
     );
   }

@@ -1,18 +1,137 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
 
-const mockSignals = [
-  { id: '1', pair: 'EUR/USD', type: 'BUY', entryPrice: 1.08500, takeProfit1: 1.08700, takeProfit2: 1.08900, stopLoss: 1.08300, analysis: 'ICT Order Block + FVG confluence', status: 'ACTIVE', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), result: 'PENDING', pips: null },
-  { id: '2', pair: 'GBP/USD', type: 'SELL', entryPrice: 1.26500, takeProfit1: 1.26300, takeProfit2: 1.26100, stopLoss: 1.26700, analysis: 'Bearish order block at resistance', status: 'HIT_TP1', createdAt: new Date(Date.now() - 86400000).toISOString(), result: 'WIN', pips: 45.5 },
-  { id: '3', pair: 'XAU/USD', type: 'BUY', entryPrice: 2325.50, takeProfit1: 2340.00, takeProfit2: 2355.00, stopLoss: 2315.00, analysis: 'Gold support at liquidity zone', status: 'HIT_TP2', createdAt: new Date(Date.now() - 172800000).toISOString(), result: 'WIN', pips: 95.0 },
-  { id: '4', pair: 'USD/JPY', type: 'SELL', entryPrice: 154.500, takeProfit1: 154.200, takeProfit2: 153.900, stopLoss: 154.800, analysis: 'BOJ intervention risk', status: 'HIT_SL', createdAt: new Date(Date.now() - 259200000).toISOString(), result: 'LOSS', pips: -30.0 },
-  { id: '5', pair: 'GBP/JPY', type: 'BUY', entryPrice: 195.500, takeProfit1: 195.800, takeProfit2: 196.200, stopLoss: 195.100, analysis: 'Bullish momentum', status: 'ACTIVE', createdAt: new Date(Date.now() - 43200000).toISOString(), result: 'PENDING', pips: null },
-  { id: '6', pair: 'AUD/USD', type: 'BUY', entryPrice: 0.65200, takeProfit1: 0.65450, takeProfit2: 0.65700, stopLoss: 0.64950, analysis: 'Bullish FVG', status: 'ACTIVE', createdAt: new Date(Date.now() - 21600000).toISOString(), result: 'PENDING', pips: null },
-];
-
+// GET - List all signals with pagination
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '10');
-  const startIndex = (page - 1) * limit;
-  return NextResponse.json({ signals: mockSignals.slice(startIndex, startIndex + limit), pagination: { page, limit, total: mockSignals.length, totalPages: Math.ceil(mockSignals.length / limit) } });
+  try {
+    const searchParams = request.nextUrl.searchParams;
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const status = searchParams.get('status');
+    const skip = (page - 1) * limit;
+
+    const where = status ? { status } : {};
+
+    const [signals, total] = await Promise.all([
+      db.signal.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      db.signal.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      signals,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching signals:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch signals' },
+      { status: 500 }
+    );
+  }
+}
+
+// POST - Create new signal
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { pair, type, entryPrice, takeProfit1, takeProfit2, stopLoss, analysis } = body;
+
+    // Validation
+    if (!pair || !type || !entryPrice || !takeProfit1 || !stopLoss) {
+      return NextResponse.json(
+        { error: 'Missing required fields: pair, type, entryPrice, takeProfit1, stopLoss' },
+        { status: 400 }
+      );
+    }
+
+    if (type !== 'BUY' && type !== 'SELL') {
+      return NextResponse.json(
+        { error: 'Type must be either BUY or SELL' },
+        { status: 400 }
+      );
+    }
+
+    const signal = await db.signal.create({
+      data: {
+        pair,
+        type,
+        entryPrice: parseFloat(entryPrice),
+        takeProfit1: parseFloat(takeProfit1),
+        takeProfit2: takeProfit2 ? parseFloat(takeProfit2) : null,
+        stopLoss: parseFloat(stopLoss),
+        analysis,
+        status: 'ACTIVE',
+        result: 'PENDING',
+      },
+    });
+
+    // Update performance stats
+    await updatePerformanceStats();
+
+    return NextResponse.json(signal, { status: 201 });
+  } catch (error) {
+    console.error('Error creating signal:', error);
+    return NextResponse.json(
+      { error: 'Failed to create signal' },
+      { status: 500 }
+    );
+  }
+}
+
+// Helper function to update performance stats
+async function updatePerformanceStats() {
+  try {
+    const signals = await db.signal.findMany({
+      where: { status: { not: 'ACTIVE' } },
+    });
+
+    const totalSignals = signals.length;
+    const winCount = signals.filter(s => s.result === 'WIN').length;
+    const lossCount = signals.filter(s => s.result === 'LOSS').length;
+    const pendingCount = signals.filter(s => s.result === 'PENDING').length;
+    const winRate = totalSignals > 0 ? (winCount / totalSignals) * 100 : 0;
+    const avgPips = signals.length > 0 
+      ? signals.reduce((acc, s) => acc + (s.pips || 0), 0) / signals.length 
+      : 0;
+
+    // Upsert performance record
+    const existing = await db.signalPerformance.findFirst();
+    
+    if (existing) {
+      await db.signalPerformance.update({
+        where: { id: existing.id },
+        data: {
+          totalSignals,
+          winCount,
+          lossCount,
+          pendingCount,
+          winRate,
+          avgPips,
+        },
+      });
+    } else {
+      await db.signalPerformance.create({
+        data: {
+          totalSignals,
+          winCount,
+          lossCount,
+          pendingCount,
+          winRate,
+          avgPips,
+        },
+      });
+    }
+  } catch (error) {
+    console.error('Error updating performance stats:', error);
+  }
 }

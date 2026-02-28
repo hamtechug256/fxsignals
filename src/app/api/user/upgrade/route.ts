@@ -18,11 +18,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Invalid plan' }, { status: 400 });
     }
 
+    // Update user plan
     const user = await prisma.user.update({
       where: { email: session.user.email },
       data: {
         plan,
-        subscriptionEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        subscriptionEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
       },
     });
 
