@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import {
@@ -19,7 +18,6 @@ import {
   TrendingUp,
   TrendingDown,
   Bell,
-  BellOff,
   Crown,
   Clock,
   Target,
@@ -27,8 +25,10 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
+  Settings,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 interface Signal {
   id: string;
@@ -54,24 +54,9 @@ interface UserData {
 }
 
 const planDetails = {
-  FREE: {
-    name: 'Free',
-    price: 0,
-    features: ['3 signals per day', 'Basic email alerts', 'Limited history'],
-    color: 'bg-gray-500',
-  },
-  PREMIUM: {
-    name: 'Premium',
-    price: 29,
-    features: ['Unlimited signals', 'Push notifications', 'Full history', 'Priority support'],
-    color: 'bg-emerald-500',
-  },
-  VIP: {
-    name: 'VIP',
-    price: 99,
-    features: ['Everything in Premium', 'Early signals', 'Direct WhatsApp support', 'Weekly analysis calls'],
-    color: 'bg-yellow-500',
-  },
+  FREE: { name: 'Free', color: 'bg-gray-500' },
+  PREMIUM: { name: 'Premium', color: 'bg-emerald-500' },
+  VIP: { name: 'VIP', color: 'bg-yellow-500' },
 };
 
 export function UserDashboard() {
@@ -80,12 +65,12 @@ export function UserDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<'PREMIUM' | 'VIP'>('PREMIUM');
-  const [isUpgrading, setIsUpgrading] = useState(false);
+  const hasFetched = useRef(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (session) {
+    if (session && !hasFetched.current) {
+      hasFetched.current = true;
       fetchUserData();
       checkNotificationPermission();
     }
@@ -106,96 +91,33 @@ export function UserDashboard() {
   };
 
   const checkNotificationPermission = () => {
-    if ('Notification' in window) {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
       setNotificationsEnabled(Notification.permission === 'granted');
     }
   };
 
   const toggleNotifications = async () => {
-    if (!('Notification' in window)) {
-      toast({
-        title: 'Not Supported',
-        description: 'Push notifications are not supported in this browser.',
-        variant: 'destructive',
-      });
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      toast({ title: 'Not Supported', description: 'Push notifications not supported.', variant: 'destructive' });
       return;
     }
 
     if (Notification.permission === 'granted') {
-      toast({
-        title: 'Notifications Enabled',
-        description: 'You will receive trading signal alerts.',
-      });
+      toast({ title: 'Notifications Already Enabled' });
       return;
     }
 
     const permission = await Notification.requestPermission();
     setNotificationsEnabled(permission === 'granted');
-
+    
     if (permission === 'granted') {
-      // Subscribe to push notifications
-      try {
-        const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-        });
-
-        // Save subscription to server
-        await fetch('/api/push/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(subscription),
-        });
-
-        toast({
-          title: 'Notifications Enabled!',
-          description: 'You will receive instant trading signal alerts.',
-        });
-      } catch (error) {
-        console.error('Push subscription error:', error);
-      }
+      toast({ title: 'Notifications Enabled!', description: 'You will receive trading signal alerts.' });
     }
   };
 
-  const handleUpgrade = async () => {
-    setIsUpgrading(true);
-
-    try {
-      const response = await fetch('/api/user/upgrade', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: selectedPlan }),
-      });
-
-      if (response.ok) {
-        toast({
-          title: 'Plan Upgraded!',
-          description: `You are now on the ${planDetails[selectedPlan].name} plan.`,
-        });
-        setShowUpgrade(false);
-        // Refresh session would happen here in production
-        window.location.reload();
-      } else {
-        throw new Error('Upgrade failed');
-      }
-    } catch (error) {
-      toast({
-        title: 'Upgrade Failed',
-        description: 'Please try again or contact support.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsUpgrading(false);
-    }
-  };
-
+  // Not logged in - don't show dashboard
   if (status === 'loading' || isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
-      </div>
-    );
+    return null;
   }
 
   if (!session) {
@@ -203,26 +125,36 @@ export function UserDashboard() {
   }
 
   const currentPlan = (session.user as any)?.plan || 'FREE';
+  const isAdmin = (session.user as any)?.role === 'ADMIN';
 
   return (
-    <div className="space-y-6" id="dashboard">
-      {/* User Info Card */}
+    <div className="space-y-6">
+      {/* Welcome Card */}
       <Card className="bg-gray-900/50 border-gray-800">
-        <CardHeader>
-          <div className="flex items-center justify-between">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
-              <CardTitle className="text-white">Welcome, {session.user?.name || 'Trader'}!</CardTitle>
+              <CardTitle className="text-white text-xl">
+                Welcome, {session.user?.name || 'Trader'}!
+              </CardTitle>
               <CardDescription className="text-gray-400">
                 {session.user?.email}
               </CardDescription>
             </div>
-            <Badge className={`${planDetails[currentPlan as keyof typeof planDetails]?.color || 'bg-gray-500'} text-white`}>
-              {planDetails[currentPlan as keyof typeof planDetails]?.name || 'Free'} Plan
-            </Badge>
+            <div className="flex items-center gap-3">
+              <Badge className={`${planDetails[currentPlan as keyof typeof planDetails]?.color || 'bg-gray-500'} text-white`}>
+                {planDetails[currentPlan as keyof typeof planDetails]?.name || 'Free'} Plan
+              </Badge>
+              {isAdmin && (
+                <Badge className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                  Admin
+                </Badge>
+              )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
+        <CardContent className="pt-0">
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-2">
               <Bell className="h-4 w-4 text-gray-400" />
               <Label htmlFor="notifications" className="text-sm text-gray-400">
@@ -238,7 +170,7 @@ export function UserDashboard() {
         </CardContent>
       </Card>
 
-      {/* Stats Cards */}
+      {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="bg-gray-900/50 border-gray-800">
           <CardContent className="pt-6">
@@ -248,9 +180,7 @@ export function UserDashboard() {
               </div>
               <div>
                 <p className="text-sm text-gray-400">Total Signals</p>
-                <p className="text-2xl font-bold text-white">
-                  {userData?.stats.totalSignals || 0}
-                </p>
+                <p className="text-2xl font-bold text-white">{userData?.stats.totalSignals || 0}</p>
               </div>
             </div>
           </CardContent>
@@ -264,9 +194,7 @@ export function UserDashboard() {
               </div>
               <div>
                 <p className="text-sm text-gray-400">Win Rate</p>
-                <p className="text-2xl font-bold text-white">
-                  {userData?.stats.winRate.toFixed(1) || 0}%
-                </p>
+                <p className="text-2xl font-bold text-white">{userData?.stats.winRate.toFixed(1) || 0}%</p>
               </div>
             </div>
           </CardContent>
@@ -280,97 +208,38 @@ export function UserDashboard() {
               </div>
               <div>
                 <p className="text-sm text-gray-400">Avg Pips</p>
-                <p className="text-2xl font-bold text-white">
-                  {userData?.stats.avgPips.toFixed(1) || 0}
-                </p>
+                <p className="text-2xl font-bold text-white">{userData?.stats.avgPips.toFixed(1) || 0}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Signal History */}
-      <Card className="bg-gray-900/50 border-gray-800">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Signal History
-              </CardTitle>
-              <CardDescription>Your recent trading signals</CardDescription>
-            </div>
-            {currentPlan === 'FREE' && (
-              <Button
-                onClick={() => setShowUpgrade(true)}
-                className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-black"
-              >
-                <Crown className="h-4 w-4 mr-2" />
-                Upgrade for Full History
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {userData?.signals.length === 0 ? (
-            <div className="text-center py-8 text-gray-400">
-              <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No signals yet. Check back soon!</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {userData?.signals.map((signal) => (
-                <div
-                  key={signal.id}
-                  className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg border border-gray-700/50"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${
-                      signal.type === 'BUY' ? 'bg-emerald-500/10' : 'bg-red-500/10'
-                    }`}>
-                      {signal.type === 'BUY' ? (
-                        <TrendingUp className="h-4 w-4 text-emerald-500" />
-                      ) : (
-                        <TrendingDown className="h-4 w-4 text-red-500" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-white">{signal.pair}</p>
-                      <p className="text-xs text-gray-400">
-                        Entry: {signal.entryPrice.toFixed(5)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    {signal.result === 'WIN' && (
-                      <div className="flex items-center gap-1 text-emerald-500">
-                        <CheckCircle className="h-4 w-4" />
-                        <span className="font-semibold">+{signal.pips?.toFixed(1)} pips</span>
-                      </div>
-                    )}
-                    {signal.result === 'LOSS' && (
-                      <div className="flex items-center gap-1 text-red-500">
-                        <XCircle className="h-4 w-4" />
-                        <span className="font-semibold">{signal.pips?.toFixed(1)} pips</span>
-                      </div>
-                    )}
-                    {signal.result === 'PENDING' && (
-                      <Badge variant="outline" className="border-yellow-500 text-yellow-500">
-                        Active
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Quick Links */}
+      <div className="flex flex-wrap gap-3">
+        <Button asChild variant="outline" className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10">
+          <a href="#signals">View All Signals</a>
+        </Button>
+        <Button asChild variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800">
+          <a href="#calculator">Risk Calculator</a>
+        </Button>
+        <Button asChild variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800">
+          <a href="#analytics">Analytics</a>
+        </Button>
+        {currentPlan === 'FREE' && (
+          <Button 
+            onClick={() => setShowUpgrade(true)}
+            className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-black"
+          >
+            <Crown className="h-4 w-4 mr-2" />
+            Upgrade Plan
+          </Button>
+        )}
+      </div>
 
       {/* Upgrade Dialog */}
       <Dialog open={showUpgrade} onOpenChange={setShowUpgrade}>
-        <DialogContent className="bg-gray-900 border-gray-800 text-white sm:max-w-lg">
+        <DialogContent className="bg-gray-900 border-gray-800 text-white sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-center">Upgrade Your Plan</DialogTitle>
             <DialogDescription className="text-gray-400 text-center">
@@ -378,68 +247,21 @@ export function UserDashboard() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 mt-4">
-            {(['PREMIUM', 'VIP'] as const).map((plan) => (
-              <Card
-                key={plan}
-                className={`cursor-pointer transition-all ${
-                  selectedPlan === plan
-                    ? 'border-emerald-500 bg-emerald-500/10'
-                    : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
-                }`}
-                onClick={() => setSelectedPlan(plan)}
-              >
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-bold text-lg text-white">
-                        {planDetails[plan].name}
-                      </h3>
-                      <p className="text-2xl font-bold text-emerald-500">
-                        ${planDetails[plan].price}
-                        <span className="text-sm text-gray-400">/month</span>
-                      </p>
-                    </div>
-                    <div className={`w-5 h-5 rounded-full border-2 ${
-                      selectedPlan === plan
-                        ? 'border-emerald-500 bg-emerald-500'
-                        : 'border-gray-600'
-                    }`}>
-                      {selectedPlan === plan && (
-                        <CheckCircle className="h-4 w-4 text-black" />
-                      )}
-                    </div>
-                  </div>
-                  <ul className="mt-4 space-y-2">
-                    {planDetails[plan].features.map((feature, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm text-gray-300">
-                        <CheckCircle className="h-4 w-4 text-emerald-500" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="space-y-3 mt-4">
+            <p className="text-center text-gray-400 text-sm">
+              Premium plans include unlimited signals, push notifications, and more!
+            </p>
+            <Button
+              onClick={() => {
+                toast({ title: 'Demo Mode', description: 'Payment integration coming soon!' });
+                setShowUpgrade(false);
+              }}
+              className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-black"
+            >
+              <Crown className="h-4 w-4 mr-2" />
+              Coming Soon
+            </Button>
           </div>
-
-          <Button
-            onClick={handleUpgrade}
-            disabled={isUpgrading}
-            className="w-full mt-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-black"
-          >
-            {isUpgrading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <>
-                <Crown className="h-4 w-4 mr-2" />
-                Upgrade to {planDetails[selectedPlan].name}
-              </>
-            )}
-          </Button>
-          <p className="text-xs text-center text-gray-500 mt-2">
-            Demo mode - No actual payment required
-          </p>
         </DialogContent>
       </Dialog>
     </div>
