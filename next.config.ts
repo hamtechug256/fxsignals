@@ -6,13 +6,9 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
-  experimental: {
-    serverComponentsExternalPackages: ['lightweight-charts'],
-  },
-  webpack: (config) => {
-    config.externals = config.externals || [];
-    return config;
-  },
+  serverExternalPackages: ['lightweight-charts'],
+  // Add empty turbopack config to silence the warning
+  turbopack: {},
 };
 
 export default nextConfig;
