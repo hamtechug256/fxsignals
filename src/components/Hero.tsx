@@ -15,7 +15,7 @@ export function Hero() {
   const [isVisible] = useState(true);
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-28 pb-16">
       {/* Animated Background */}
       <div className="absolute inset-0 bg-gradient-to-b from-emerald-900/20 via-transparent to-transparent" />
       <div className="absolute inset-0">
